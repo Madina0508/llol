@@ -56,7 +56,7 @@ bonus_value = driver.find_element_by_css_selector('body > div.wrapper.wrapper--f
 df = df.append({'Name':bonus.text,'Data':bonus_value.text}, ignore_index=True)
 
 
-df.to_csv("kaspi_red.csv")
+df.to_csv("kaspi_red.csv", encoding = 'utf-8')
 
 
 
