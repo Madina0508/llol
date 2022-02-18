@@ -3,6 +3,10 @@ import pandas
 import csv
 import json
 import sys
+import os
+import sqlite3
+import openpyxl
+
 url = 'http://localhost:8080/engine-rest'
 worker_id = 'py'
 variables = ['Input_2gb12m1']
@@ -12,54 +16,66 @@ fetch_and_lock = pycamunda.externaltask.FetchAndLock(url=url, worker_id=worker_i
 fetch_and_lock.add_topic(name='python', lock_duration=10000, variables=variables)
 tasks = fetch_and_lock()
 
-var=pycamunda.variable.Get(url=url, id_=id_)
-directory=var().value
-print(var().value)
+var=pycamunda.variable.GetList(url=url, name=variables)
+#var=pycamunda.variable.Get(url=url, id_=id_)
+#directory=var().value
+directory=var([0])[1].value
+print(var([0])[1].value)
 
 csvFilePath = r'file.csv'
 jsonFilePath = r'data.json'
 jsonArray = []
 
-with open(directory+'\\ИВЦ БНС, Данные по МСП, 2021, М12, Декабрь.xlsx',"rb") as f:
+for task in tasks:
+    complete = pycamunda.externaltask.Complete(url=url, id_=task.id_, worker_id=worker_id)
+
+    with open(directory+'\\ИВЦ БНС, Данные по МСП, 2021, М12, Декабрь.xlsx',"rb") as f:
     
-    excel_data_df = pandas.read_excel(f,header=1,skiprows=1)
-    excel_data_df.to_csv("file.csv", header=1, index=False, encoding="utf-8")
-    df=pandas.read_csv('file.csv',index_col=None)
-    #df=df.drop(df.columns[[0]], axis = 1)
-    #print(df)
-    df1=df.iloc[0:19]
-   
-    if (df1.columns[0]=="Юридические лица") or (df1.columns[0]=="Индивидуальные предприниматели") or (df1.columns[0]=="Крестьянско-фермерские хозяйства"):
-        df1.columns=df1.iloc[0]
-        df1=df1[1:]
-        df2=df.iloc[20:40]
-        #print(df1)
-    else:
-        print('error')
-        sys.exit()
-    if (df2.columns[0]=="Юридические лица") or (df2.columns[0]=="Индивидуальные предприниматели") or (df2.columns[0]=="Крестьянско-фермерские хозяйства"):
-        df2.columns=df2.iloc[1]
-        df2=df2[2:]
-        #print(df2)
-        df3=df.iloc[41:61]
+        excel_data_df = pandas.read_excel(f,header=1,skiprows=1)
+        print(excel_data_df)
+        excel_data_df.to_csv("file.csv", header=1, index=False, encoding="utf-8")
+        df=pandas.read_csv('file.csv',index_col=None)
+        #df=df.drop(df.columns[[0]], axis = 1)
+        print(df)
+        df1=df.iloc[0:19]
+            
+        if (df1.columns[0]=="Юридические лица") or (df1.columns[0]=="Индивидуальные предприниматели") or (df1.columns[0]=="Крестьянско-фермерские хозяйства"):
+            df1.columns=df1.iloc[0]
+            df1=df1[1:]
+            df2=df.iloc[20:40]
+            #print(df1)
+        else:
+            print('error')
+            complete.add_variable(name='ServiceTaskVariable', value='err')# Send this variable to the instance
+            complete()
+            sys.exit()
+        if (df2.columns[0]=="Юридические лица") or (df2.columns[0]=="Индивидуальные предприниматели") or (df2.columns[0]=="Крестьянско-фермерские хозяйства"):
+            df2.columns=df2.iloc[1]
+            df2=df2[2:]
+            #print(df2)
+            df3=df.iloc[41:61]
         
-    else:
-        print('error')
-        sys.exit()
-    if (df3.columns[0]=="Юридические лица") or (df3.columns[0]=="Индивидуальные предприниматели") or (df3.columns[0]=="Крестьянско-фермерские хозяйства"):
-        df3.columns=df3.iloc[1]
-        df3=df3[2:]
-        #print(df3)
-        df=pandas.concat([df1,df2,df3],ignore_index=True)
-        df.to_csv("file1.csv", header=1, index=False, encoding="utf-8")
-        df=pandas.read_csv('file1.csv',index_col=None)
-        #print(df)
-        #print(df['всего'])
-    else:
-        print('error')
-        sys.exit()
+        else:
+            print('error')
+            complete.add_variable(name='ServiceTaskVariable', value='err')# Send this variable to the instance
+            complete()
+            sys.exit()
+        if (df3.columns[0]=="Юридические лица") or (df3.columns[0]=="Индивидуальные предприниматели") or (df3.columns[0]=="Крестьянско-фермерские хозяйства"):
+            df3.columns=df3.iloc[1]
+            df3=df3[2:]
+            #print(df3)
+            df=pandas.concat([df1,df2,df3],ignore_index=True)
+            df.to_csv("file1.csv", header=1, index=False, encoding="utf-8")
+            df=pandas.read_csv('file1.csv',index_col=None)
+            #print(df)
+            #print(df['всего'])
+        else:
+            print('error')
+            complete.add_variable(name='ServiceTaskVariable', value='err')# Send this variable to the instance
+            complete()
+            sys.exit()
         
-    if (df[df.columns[0]].iloc[0]=="Республика Казахстан" and 
+        if (df[df.columns[0]].iloc[0]=="Республика Казахстан" and 
         df[df.columns[0]].iloc[1]=="Акмолинская область" and
         df[df.columns[0]].iloc[2]=="Актюбинская область" and
         df[df.columns[0]].iloc[3]=="Алматинская область" and
@@ -120,9 +136,19 @@ with open(directory+'\\ИВЦ БНС, Данные по МСП, 2021, М12, Де
                 and (df['нет информации или бездействующий'].dtype.kind=='i' or df['нет информации или бездействующий'].dtype.kind=='f')
                 and (df['Приостановившее деятельность'].dtype.kind=='i' or df['Приостановившее деятельность'].dtype.kind=='f')
                 and (df['в процессе ликвидации'].dtype.kind=='i' or df['в процессе ликвидации'].dtype.kind=='f')):
-        print('ok')
-    else:
+            print('ok')
+            con = sqlite3.connect('test.db')
+            cur = con.cursor()
+            columns=['Регионы',	'всего',	'вновь зарегистрированное',	'активное',	'временно приостановившее деятельность',	'нет информации или бездействующий',	'Приостановившее деятельность',	'в процессе ликвидации']
+            df=pandas.read_csv('file.csv',index_col=None,header = None, names = columns)
+            df.to_sql('user', con=con, if_exists='append', index=False)
+            con.commit()
+            complete.add_variable(name='ServiceTaskVariable', value='ok')# Send this variable to the instance
+            complete()
+        else:
             print('error')
+            complete.add_variable(name='ServiceTaskVariable', value='err')# Send this variable to the instance
+            complete()
             sys.exit()
     '''if (df2.columns[0]=="Юридические лица") or (df2.columns[0]=="Индивидуальные предприниматели") or (df2.columns[0]=="Крестьянско-фермерские хозяйства"):
         df2.columns=df2.iloc[0]
