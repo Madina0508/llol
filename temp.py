@@ -19,8 +19,9 @@ tasks = fetch_and_lock()
 var=pycamunda.variable.GetList(url=url, name=variables)
 #var=pycamunda.variable.Get(url=url, id_=id_)
 #directory=var().value
-directory=var([0])[1].value
-print(var([0])[1].value)
+directory=var()[0].value
+print(var()[0].value)
+
 
 csvFilePath = r'file.csv'
 jsonFilePath = r'data.json'
@@ -29,7 +30,7 @@ jsonArray = []
 for task in tasks:
     complete = pycamunda.externaltask.Complete(url=url, id_=task.id_, worker_id=worker_id)
 
-    with open(directory+'\\ИВЦ БНС, Данные по МСП, 2021, М12, Декабрь.xlsx',"rb") as f:
+    with open('11.xlsx',"rb") as f:
     
         excel_data_df = pandas.read_excel(f,header=1,skiprows=1)
         print(excel_data_df)
